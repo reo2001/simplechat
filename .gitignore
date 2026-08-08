@@ -1,17 +1,27 @@
-# CDKビルド出力
+# AWS CDK output
 cdk.out/
 
-# 依存関係
+# Dependencies
 node_modules/
 frontend/node_modules/
 
-# ロックファイル
-package-lock.json
-frontend/package-lock.json
-
-# フロントエンドビルド
+# Frontend build output
 frontend/build/
 
-# その他一般的な無視ファイル
+# Local environment files (keep examples tracked)
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Local and generated files
 .DS_Store
 *.log
+coverage/
+dist/
+
+# Python cache
+__pycache__/
+*.py[cod]

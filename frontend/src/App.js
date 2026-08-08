@@ -1,14 +1,11 @@
-// frontend/src/App.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Amplify, Auth } from 'aws-amplify';
 import { Authenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import axios from 'axios';
 import './App.css';
 
-// 設定を読み込む関数
 const loadConfig = () => {
-  // ウィンドウオブジェクトから設定を取得
   if (window.REACT_APP_CONFIG) {
     return {
       apiEndpoint: window.REACT_APP_CONFIG.apiEndpoint,
@@ -17,8 +14,7 @@ const loadConfig = () => {
       region: window.REACT_APP_CONFIG.region,
     };
   }
-  
-  // 環境変数から設定を取得（ローカル開発用）
+
   return {
     apiEndpoint: process.env.REACT_APP_API_ENDPOINT || 'YOUR_API_ENDPOINT',
     userPoolId: process.env.REACT_APP_USER_POOL_ID || 'YOUR_USER_POOL_ID',
@@ -27,10 +23,8 @@ const loadConfig = () => {
   };
 };
 
-// 設定を取得
 const config = loadConfig();
 
-// Amplify設定
 Amplify.configure({
   Auth: {
     region: config.region,
@@ -39,7 +33,6 @@ Amplify.configure({
   },
 });
 
-// ChatInterfaceコンポーネントの定義
 function ChatInterface({ signOut, user }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -47,55 +40,54 @@ function ChatInterface({ signOut, user }) {
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // メッセージが追加されたら自動スクロール
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  // チャットメッセージ送信
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     if (!input.trim()) return;
 
     const userMessage = input;
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setMessages((previous) => [...previous, { role: 'user', content: userMessage }]);
     setLoading(true);
     setError(null);
 
     try {
-      // 認証トークンを取得
       const session = await Auth.currentSession();
       const idToken = session.getIdToken().getJwtToken();
 
-      const response = await axios.post(config.apiEndpoint, {
-        message: userMessage,
-        conversationHistory: messages
-      }, {
-        headers: {
-          'Authorization': idToken,
-          'Content-Type': 'application/json'
+      const response = await axios.post(
+        config.apiEndpoint,
+        {
+          message: userMessage,
+          conversationHistory: messages,
+        },
+        {
+          headers: {
+            Authorization: idToken,
+            'Content-Type': 'application/json',
+          },
         }
-      });
+      );
 
       if (response.data.success) {
-        setMessages(prev => [...prev, { role: 'assistant', content: response.data.response }]);
+        setMessages((previous) => [
+          ...previous,
+          { role: 'assistant', content: response.data.response },
+        ]);
       } else {
-        setError('応答の取得に失敗しました');
+        setError('応答の取得に失敗しました。');
       }
-    } catch (err) {
-      console.error("API Error:", err);
-      setError(`エラーが発生しました: ${err.message}`);
+    } catch (requestError) {
+      console.error('API error:', requestError);
+      setError(`エラーが発生しました: ${requestError.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // 会話をクリア
   const clearConversation = () => {
     setMessages([]);
   };
@@ -113,55 +105,51 @@ function ChatInterface({ signOut, user }) {
           </button>
         </div>
       </header>
-      
+
       <main className="chat-container">
         <div className="messages-container">
           {messages.length === 0 ? (
             <div className="welcome-message">
-              <h2>Bedrock Chatbot へようこそ！</h2>
-              <p>何でも質問してください。</p>
+              <h2>Bedrock Chatbotへようこそ</h2>
+              <p>メッセージを入力して、AIとの会話を始めてください。</p>
             </div>
           ) : (
-            messages.map((msg, index) => (
-              <div key={index} className={`message ${msg.role}`}>
+            messages.map((message, index) => (
+              <div key={index} className={`message ${message.role}`}>
                 <div className="message-content">
-                  {msg.content.split('\n').map((line, i) => (
-                    <p key={i}>{line}</p>
+                  {message.content.split('\n').map((line, lineIndex) => (
+                    <p key={lineIndex}>{line}</p>
                   ))}
                 </div>
               </div>
             ))
           )}
-          
+
           {loading && (
             <div className="message assistant loading">
               <div className="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
+                <span />
+                <span />
+                <span />
               </div>
             </div>
           )}
-          
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
-          
+
+          {error && <div className="error-message">{error}</div>}
           <div ref={messagesEndRef} />
         </div>
-        
+
         <form onSubmit={handleSubmit} className="input-form">
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(event) => setInput(event.target.value)}
             placeholder="メッセージを入力..."
             disabled={loading}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
+            aria-label="チャットメッセージ"
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                handleSubmit(event);
               }
             }}
           />
@@ -170,7 +158,7 @@ function ChatInterface({ signOut, user }) {
           </button>
         </form>
       </main>
-      
+
       <footer>
         <p>Powered by Amazon Bedrock</p>
       </footer>
@@ -181,9 +169,7 @@ function ChatInterface({ signOut, user }) {
 function App() {
   return (
     <Authenticator>
-      {({ signOut, user }) => (
-        <ChatInterface signOut={signOut} user={user} />
-      )}
+      {({ signOut, user }) => <ChatInterface signOut={signOut} user={user} />}
     </Authenticator>
   );
 }
