@@ -1,12 +1,10 @@
-# SimpleChat — Amazon Bedrock LLM Chat Application
+# SimpleChat — Authenticated LLM Chat on AWS
 
-Amazon Bedrock（Amazon Nova Lite）を利用した、認証付きのLLMチャットアプリです。React製のフロントエンドとPython製のAWS Lambdaを、API Gateway、Amazon Cognito、CloudFront、Amazon S3と組み合わせ、AWS CDKで一括構築します。
+## Overview
 
-> このリポジトリは、AIエンジニアリング講座のベース実装をもとにした演習成果物です。コミット履歴上、`reo2001` による主な実装は `lambda/index.py` の外部FastAPI推論経路の検証です。現在はポートフォリオ向けに、Amazon Bedrockを既定の推論経路とし、外部推論経路は設定時のみ利用できる形に整理しています。
+Amazon Bedrock（Amazon Nova Lite）を利用した、AWS上の認証付きLLMチャットアプリケーションです。React製フロントエンドとPython製AWS Lambdaを、API Gateway、Amazon Cognito、CloudFront、Amazon S3と組み合わせ、AWS CDKで一括構築します。
 
-## Demo / Screenshot
-
-公開中のデモURLや画面キャプチャは含まれていません。以下はAWS上に構築される構成図です。
+> AIエンジニアリング講座のベース実装をもとにした演習成果物です。教材提供コードを含み、`reo2001` は `lambda/index.py` に外部FastAPI推論経路を追加しました。通常はAmazon Bedrockを使用し、環境変数を設定した場合だけ外部推論APIへ切り替わる構成です。
 
 ![SimpleChat architecture: CloudFront and S3 frontend, Cognito authentication, API Gateway, Lambda, and Amazon Bedrock](./architecture.png)
 
@@ -103,12 +101,12 @@ npm start
 3. チャット欄へメッセージを入力して送信します。Enterで送信、Shift+Enterで改行できます。
 4. 「会話をクリア」で画面上の会話履歴を削除できます。
 
-## Notes / Design Decisions
+## Design Notes
 
 - 既定モデルは `bin/bedrock-chatbot.ts` の `us.amazon.nova-lite-v1:0` です。
 - LambdaはCDKから渡される `MODEL_ID` を参照するため、コード内に環境固有のモデル設定を埋め込んでいません。
 - デプロイ時にカスタムリソースが `config.js` をS3へ生成し、API URLとCognito設定をReactアプリへ渡します。
-- 課題で検証した外部FastAPI推論経路は、CDK実行時に `EXTERNAL_MODEL_ENDPOINT` を設定した場合のみ有効です。一時的なngrok URLはリポジトリに保存しません。
+- 外部FastAPI推論経路は、CDK実行時に `EXTERNAL_MODEL_ENDPOINT` を設定した場合のみ有効です。未設定時はAmazon Bedrockを使用し、一時的なngrok URLはリポジトリに保存しません。
 - S3バケットとCloudFrontなどのリソースは、学習環境を片付けやすい削除設定です。本番運用では保持ポリシー、ログ、監視、WAFなどを別途検討する必要があります。
 
 外部推論APIを利用する例:
