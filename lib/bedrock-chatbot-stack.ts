@@ -15,6 +15,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 
 export interface BedrockChatbotStackProps extends cdk.StackProps {
   modelId?: string;
+  externalModelEndpoint?: string;
 }
 
 export class BedrockChatbotStack extends cdk.Stack {
@@ -158,13 +159,16 @@ export class BedrockChatbotStack extends cdk.Stack {
       role: lambdaRole,
       environment: {
         MODEL_ID: modelId,
+        ...(props?.externalModelEndpoint
+          ? { EXTERNAL_MODEL_ENDPOINT: props.externalModelEndpoint }
+          : {}),
       },
     });
 
     // 明示的な依存関係を追加
     const cfnChatFunction = chatFunction.node.defaultChild as lambda.CfnFunction;
     const cfnLambdaRole = lambdaRole.node.defaultChild as iam.CfnRole;
-    cfnChatFunction.addDependsOn(cfnLambdaRole);
+    cfnChatFunction.addDependency(cfnLambdaRole);
 
     // API Gateway with Cognito Authorizer
     const api = new apigateway.RestApi(this, 'ChatbotApi', {
@@ -217,7 +221,7 @@ export class BedrockChatbotStack extends cdk.Stack {
     
     // 設定生成用のLambda関数
     const configGeneratorFunction = new lambda.Function(this, 'ConfigGeneratorFunction', {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       role: configGeneratorRole,
       code: lambda.Code.fromInline(`
@@ -227,7 +231,6 @@ export class BedrockChatbotStack extends cdk.Stack {
         const fs = require('fs');
         const path = require('path');
         const https = require('https');
-        const url = require('url');
         
         exports.handler = async (event, context) => {
           console.log('Event:', JSON.stringify(event, null, 2));
@@ -353,11 +356,11 @@ export class BedrockChatbotStack extends cdk.Stack {
           console.log('Sending response:', JSON.stringify(responseBody));
           
           return new Promise((resolve, reject) => {
-            const parsedUrl = url.parse(event.ResponseURL);
+            const parsedUrl = new URL(event.ResponseURL);
             const options = {
               hostname: parsedUrl.hostname,
               port: 443,
-              path: parsedUrl.path,
+              path: parsedUrl.pathname + parsedUrl.search,
               method: 'PUT',
               headers: {
                 'Content-Type': '',
@@ -390,7 +393,7 @@ export class BedrockChatbotStack extends cdk.Stack {
     // 明示的な依存関係を追加
     const cfnConfigFunction = configGeneratorFunction.node.defaultChild as lambda.CfnFunction;
     const cfnConfigRole = configGeneratorRole.node.defaultChild as iam.CfnRole;
-    cfnConfigFunction.addDependsOn(cfnConfigRole);
+    cfnConfigFunction.addDependency(cfnConfigRole);
     
     // カスタムリソースプロバイダー
     const configProvider = new cr.Provider(this, 'ConfigProvider', {

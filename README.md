@@ -1,109 +1,133 @@
-# Bedrock Chatbot with Cognito Authentication
+# SimpleChat — Authenticated LLM Chat on AWS
 
-Amazon Bedrock を使用したチャットボットアプリケーションで、Amazon Cognito による認証機能を備えています。
+## Overview
 
-## 機能
+Amazon Bedrock（Amazon Nova Lite）を利用した、AWS上の認証付きLLMチャットアプリケーションです。React製フロントエンドとPython製AWS Lambdaを、API Gateway、Amazon Cognito、CloudFront、Amazon S3と組み合わせ、AWS CDKで一括構築します。
 
-- Amazon Bedrock の LLM モデル（Nova Lite または micro）を使用したチャット機能
-- Amazon Cognito によるユーザー認証
-- API Gateway による安全な API アクセス
-- CloudFront + S3 によるフロントエンドホスティング
-- AWS CDK を使用したインフラのコード化
+> AIエンジニアリング講座のベース実装をもとにした演習成果物です。教材提供コードを含み、`reo2001` は `lambda/index.py` に外部FastAPI推論経路を追加しました。通常はAmazon Bedrockを使用し、環境変数を設定した場合だけ外部推論APIへ切り替わる構成です。
 
-## アーキテクチャ
+![SimpleChat architecture: CloudFront and S3 frontend, Cognito authentication, API Gateway, Lambda, and Amazon Bedrock](./architecture.png)
 
-![Architecture Diagram](./architecture.png)
+## Architecture
 
-## 前提条件
+1. ReactアプリをS3へ配置し、CloudFrontから配信します。
+2. ユーザー登録とサインインはAmazon Cognitoが管理します。
+3. ReactアプリはCognitoのIDトークンを付けてAPI Gatewayの `/chat` を呼び出します。
+4. Cognitoオーソライザーで認証後、API GatewayがPython Lambdaを実行します。
+5. LambdaがAmazon Bedrock Runtimeを呼び出し、Amazon Nova Liteの応答を返します。
+6. AWS CDKが上記リソースの作成、フロントエンドの配置、実行時設定の生成を行います。
 
-- [Node.js](https://nodejs.org/) (v14 以上)
-- [AWS CLI](https://aws.amazon.com/cli/) (設定済み)
-- [AWS CDK](https://aws.amazon.com/cdk/) (v2)
-- [Python](https://www.python.org/) (v3.9 以上)
+## Features
 
-## セットアップ手順
+- メールアドレスを使ったユーザー登録、確認、サインイン
+- Cognito認証済みユーザーだけが利用できるチャットAPI
+- Amazon Nova Liteとの複数ターン会話
+- 送信中表示、エラー表示、会話クリアを備えたReact UI
+- CloudFrontと非公開S3バケットによるフロントエンド配信
+- CDKによるインフラの構築と削除
+- 任意設定による外部FastAPI推論エンドポイントの利用
 
+## Tech Stack
 
-### 重要: Bedrockモデルアクセス許可の設定
+| Layer | Technologies |
+| --- | --- |
+| Frontend | React 18, AWS Amplify UI, Axios |
+| Authentication | Amazon Cognito |
+| API | Amazon API Gateway REST API |
+| Backend | AWS Lambda, Python 3.10, Boto3 |
+| Generative AI | Amazon Bedrock, Amazon Nova Lite |
+| Hosting | Amazon S3, Amazon CloudFront |
+| Infrastructure as Code | AWS CDK v2, TypeScript |
 
-このアプリケーションを使用するには、AWS Bedrockのモデルへのアクセス許可が必要です。
-以下の手順でモデルアクセスを有効にしてください：
+## Project Structure
 
-1. AWS Managementコンソールにログイン
-2. Amazon Bedrockサービスが利用可能なリージョンに移動
-3. 左側のナビゲーションから「モデルアクセス」を選択
-4. 使用するモデル（例：us.amazon.nova-lite-v1:0）の横にあるチェックボックスをオンにする
-5. 画面下部の「次へ」ボタンをクリックし、内容を確認の上、「送信」をクリックする
-
-* Cross Region Inferenceが有効となっているリージョンを推奨します。
-* アクセス許可がない状態で環境をセットアップした場合、チャットボットは500エラーを返します。
-
-
-### 1. リポジトリのクローン
-
+```text
+.
+├── bin/                         # CDKアプリのエントリーポイントとモデル・リージョン設定
+├── frontend/
+│   ├── public/                  # ReactのHTMLテンプレート
+│   └── src/                     # 認証画面とチャットUI
+├── lambda/
+│   ├── index.py                 # Bedrockまたは外部推論APIを呼び出すチャット処理
+│   └── requirements.txt         # Lambda用Python依存関係
+├── lib/
+│   └── bedrock-chatbot-stack.ts # Cognito、API、Lambda、S3、CloudFrontのCDK定義
+├── architecture.png             # AWS構成図
+├── cdk.json                     # CDK Toolkit設定
+├── package.json                 # CDKプロジェクトの依存関係とコマンド
+└── tsconfig.json                # TypeScriptコンパイラ設定
 ```
-git clone https://github.com/keisskaws/simplechat
+
+## Setup
+
+### Prerequisites
+
+- Node.js 20以上とnpm
+- AWS CLIで認証情報を設定済みであること
+- デプロイ先リージョンでAmazon Nova Liteを利用できること
+- AWSリソースを作成できる権限があること
+
+### Install and deploy
+
+```bash
+git clone https://github.com/reo2001/simplechat.git
 cd simplechat
-```
-
-### 2. CDK プロジェクトの依存関係 && フロントエンドのビルド
-```
 npm install
-```
-
-### 3. AWS アカウントのブートストラップ（初回のみ）
-```
 npx cdk bootstrap
+npm run synth
+npm run deploy
 ```
 
-### 4. CDK スタックのデプロイ
-```
-npx cdk deploy
-```
+`npm install` の `postinstall` でフロントエンドの依存関係インストールと本番ビルドも実行されます。デプロイ完了後、出力された `CloudFrontURL` を開いてください。
 
-### 5. アプリケーションへのアクセス
-デプロイ出力に表示された CloudFront URL にアクセスしてアプリケーションを使用します。
+AWSアカウントやリージョンを明示する場合は、AWS CLIのプロファイルや `CDK_DEFAULT_ACCOUNT` / `CDK_DEFAULT_REGION` を設定してから実行します。未指定時のリージョンは `us-east-1` です。
 
-使用方法
-CloudFront URL にアクセスします
-「サインアップ」をクリックして新しいアカウントを作成します
-登録したメールアドレスに送信された確認コードを入力します
-ログイン後、チャットインターフェースが表示されます
-メッセージを入力して Amazon Bedrock モデルと対話します
-カスタマイズ
-別の Bedrock モデルの使用
-bin/bedrock-chatbot.ts ファイルを編集して、使用するモデルを変更できます：
+### Local frontend development
 
-```
-typescript 
+`frontend/.env.example` を `frontend/.env` にコピーし、デプロイ済みスタックの出力値を設定します。
 
-new BedrockChatbotStack(app, 'BedrockChatbotStack', {
-  modelId: 'us.amazon.nova-micro-v1:0',
-  // ...
-});
+```bash
+cd frontend
+npm install
+npm start
 ```
 
+`.env` はGit管理対象外です。CognitoのUser Pool IDやClient IDはクライアント設定値であり秘密鍵ではありませんが、環境ごとの値をリポジトリへ固定しない方針にしています。
 
-### フロントエンドのカスタマイズ
-フロントエンドのコードは frontend/src ディレクトリにあります。React コンポーネントを編集してカスタマイズできます。
+## Usage
 
+1. CloudFront URLを開き、メールアドレスでアカウントを登録します。
+2. メールで届く確認コードを入力し、サインインします。
+3. チャット欄へメッセージを入力して送信します。Enterで送信、Shift+Enterで改行できます。
+4. 「会話をクリア」で画面上の会話履歴を削除できます。
 
+## Design Notes
 
-### クリーンアップ
-プロジェクトのリソースを削除するには以下のコマンドを実行します
+- 既定モデルは `bin/bedrock-chatbot.ts` の `us.amazon.nova-lite-v1:0` です。
+- LambdaはCDKから渡される `MODEL_ID` を参照するため、コード内に環境固有のモデル設定を埋め込んでいません。
+- デプロイ時にカスタムリソースが `config.js` をS3へ生成し、API URLとCognito設定をReactアプリへ渡します。
+- 外部FastAPI推論経路は、CDK実行時に `EXTERNAL_MODEL_ENDPOINT` を設定した場合のみ有効です。未設定時はAmazon Bedrockを使用し、一時的なngrok URLはリポジトリに保存しません。
+- S3バケットとCloudFrontなどのリソースは、学習環境を片付けやすい削除設定です。本番運用では保持ポリシー、ログ、監視、WAFなどを別途検討する必要があります。
 
+外部推論APIを利用する例:
 
+```bash
+EXTERNAL_MODEL_ENDPOINT=https://example.com/predict npm run deploy
 ```
-npx cdk destroy
+
+PowerShellでは次のように設定します。
+
+```powershell
+$env:EXTERNAL_MODEL_ENDPOINT = "https://example.com/predict"
+npm run deploy
 ```
 
+## Cleanup
 
-### トラブルシューティング
-# API 呼び出しエラー
-Cognito トークンが正しく設定されているか確認してください
-API Gateway の CORS 設定が正しいか確認してください
-CloudWatch Logs で Lambda 関数のログを確認してください
+検証後にAWSリソースを削除する場合は、次を実行します。
 
-# 認証エラー
-ユーザープールの設定を確認してください
-フロントエンドの環境変数が正しく設定されているか確認してください
+```bash
+npm run destroy
+```
+
+CloudWatch Logsなど、スタック外または保持設定のリソースが残っていないかAWSコンソールでも確認してください。
